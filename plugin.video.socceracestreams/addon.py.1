@@ -1,0 +1,95 @@
+import sys
+import urllib
+import urlparse
+import xbmcgui
+import xbmcplugin
+import xbmcvfs
+import time, os
+import requests, json, re, sys
+
+base_url = sys.argv[0]
+addon_handle = int(sys.argv[1])
+args = urlparse.parse_qs(sys.argv[2][1:])
+
+#https://www.reddit.com/r/soccerstreams/search.json?sort=new&restrict_sr=on&q=GMT
+
+
+def getreplies(data):
+  verified = False
+  try:
+    if data['author_flair_text'] is not None:
+      if re.search('Verified', data['author_flair_text'], re.IGNORECASE): verified = True
+  except:
+    pass
+  try:
+    acestreams = re.findall(r'acestream://([0-9a-z]+)', data['body'])
+    for a in acestreams:
+      links.append({'acestream':a, 'verified':verified})
+  except:
+    pass
+  try:
+    if data['replies']!="":
+      for reply in data['replies']['data']['children']:
+        getreplies(reply['data'])
+  except:
+    pass
+
+def fillcache():
+  streams = {'retrieved':int(time.time()), 'data':[]}
+  r = requests.get('https://www.reddit.com/r/soccerstreams/search.json?sort=new&restrict_sr=on&q=GMT', headers = {'User-agent': 'Kodi soccerstreams bot 0.1'})
+  result = json.loads(r.text)
+  #print result['data']['children']
+  for p in result['data']['children']:
+    if re.search(r'GMT',p['data']['title']):
+      links=[]
+      #print p['data']['title']
+      #print p['data']['url']
+      r = requests.get('%ssearch.json' % (p['data']['url']), headers = {'User-agent': 'Kodi soccerstreams bot 0.1'})
+      comments = json.loads(r.text)
+      for c in comments[1]['data']['children']:
+        getreplies(c['data'])#recursively fetch replies
+      streams['data'].append({'title':p['data']['title'], 'links':links})
+  f =xbmcvfs.File ('special://temp/streamcache', 'w')
+  f.write(json.dumps(streams))
+  f.close()
+
+if xbmcvfs.exists('special://temp/streamcache'):
+  f = xbmcvfs.File ('special://temp/streamcache', 'r')
+  streams = json.loads(f.read())
+  f.close()
+  if time.time() - streams['retrieved'] > 300:#refresh cache every 5 mins
+    fillcache()
+    f = xbmcvfs.File ('special://temp/streamcache', 'r')
+    streams = json.loads(f.read())
+    f.close()
+else:
+  fillcache()
+
+xbmcplugin.setContent(addon_handle, 'movies')
+
+def build_url(query):
+    return base_url + '?' + urllib.urlencode(query)
+
+mode = args.get('mode', None)
+
+if mode is None:
+  i=0
+  for s in streams['data']:
+    url = build_url({'mode': 'folder', 'foldername': 'match_%s' % i})
+    li = xbmcgui.ListItem("[%s] %s " % (len(s['links']), s['title']), iconImage='DefaultFolder.png')
+    xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+    i+=1
+  li = xbmcgui.ListItem("Test video", iconImage='DefaultVideo.png')
+  url = 'https://localhost/listings/live_stream_from_start.mp4'
+  xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li)
+  xbmcplugin.endOfDirectory(addon_handle)
+
+elif mode[0] == 'folder':
+  foldername = args['foldername'][0]
+  i = int(foldername[6:])
+  for s in streams['data'][i]['links']:
+    url = 'http://localhost/openpid/%s' % s['acestream']
+    url = 'https://localhost/listings/live_stream_from_start.mp4'
+    li = xbmcgui.ListItem(s['acestream'], iconImage='DefaultVideo.png')
+    xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li)
+    xbmcplugin.endOfDirectory(addon_handle)
