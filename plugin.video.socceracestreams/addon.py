@@ -4,7 +4,7 @@ import urlparse
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
-import json, datetime, requests
+import json, datetime, requests, time
 
 base_url = sys.argv[0]
 addon_handle = int(sys.argv[1])
@@ -46,8 +46,9 @@ def getfixtures(listing_type):
     r.text
     data = json.loads(r.text)
     for l in data['matches']:
-      print  l['utcDate']
-      rdata.append({'name':"%s vs %s %s" % (l['homeTeam']['name'], l['awayTeam']['name'], datetime.datetime.strptime(l['utcDate'], "%Y-%m-%dT%H:%M:%SZ").strftime("%d/%m/%y %H:%m")), 'status':l['status']})
+      #print  l['utcDate']
+      
+      rdata.append({'name':"%s vs %s %s %s" % (l['homeTeam']['name'], l['awayTeam']['name'], l['utcDate'][:10], l['utcDate'][11:16]), 'status':l['status']})
     return rdata
   
 #if xbmcvfs.exists('special://temp/streamcache'):
@@ -73,8 +74,8 @@ if mode is None:
   results = getfixtures('main') #[{'name': u'Premier League (England)', 'id': 2021}, {'name': u'Championship (England)', 'id': 2016}, {'name': u'European Championship (Europe)', 'id': 2018}, {'name': u'UEFA Champions League (Europe)', 'id': 2001}, {'name': u'Ligue 1 (France)', 'id': 2015}, {'name': u'Bundesliga (Germany)', 'id': 2002}, {'name': u'Serie A (Italy)', 'id': 2019}, {'name': u'Eredivisie (Netherlands)', 'id': 2003}, {'name': u'Primeira Liga (Portugal)', 'id': 2017}, {'name': u'Primera Division (Spain)', 'id': 2014}]
 
   for f in results:
-    url = build_url({'mode': 'folder', 'foldername': 'league_%s' % results['id']})
-    li = xbmcgui.ListItem(results['name'], iconImage='DefaultFolder.png')
+    url = build_url({'mode': 'folder', 'foldername': 'league_%s' % f['id']})
+    li = xbmcgui.ListItem(f['name'], iconImage='DefaultFolder.png')
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
   
   li = xbmcgui.ListItem("Test video", iconImage='DefaultVideo.png')
@@ -84,7 +85,20 @@ if mode is None:
 
 elif mode[0] == 'folder':
   foldername = args['foldername'][0]
-  url = 'http://localhost/openpid/'
-  li = xbmcgui.ListItem("test vid", iconImage='DefaultVideo.png')
-  xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li)
+  lid = foldername[7:]
+  results = getfixtures(lid)
+  for f in results:
+    url = build_url({'mode': 'game', 'foldername': f['name']})
+    li = xbmcgui.ListItem(f['name'], iconImage='DefaultVideo.png')
+    xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+    xbmcplugin.endOfDirectory(addon_handle)
+    
+elif mode[0] == 'game':
+  url = build_url({'mode': 'gamerecord', 'url': "http://localhost/" +args['foldername'][0]})
+  li = xbmcgui.ListItem("Record", iconImage='DefaultVideo.png')
+  xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
   xbmcplugin.endOfDirectory(addon_handle)
+  
+elif mode[0] == 'gamerecord':
+  #send request for game record
+  print args
