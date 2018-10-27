@@ -6,14 +6,10 @@ import xbmcplugin
 import xbmcvfs
 import xbmcaddon
 
-import json, datetime, urllib2, time, base64
+import json, datetime, urllib2, time, base64, re
 
 
-settings = xbmcaddon.Addon('plugin.video.socceracestreams')
 
-base_url = sys.argv[0]
-addon_handle = int(sys.argv[1])
-args = urlparse.parse_qs(sys.argv[2][1:])
 
 def fillcache():
   streams = {'retrieved':int(time.time()), 'data':[]}
@@ -38,64 +34,110 @@ def fillcache():
 def getfixtures(listing_type):
   today = datetime.datetime.today()
   rdata=[]
-  headers = {'X-Auth-Token': "1ee91953768643e4acd30e197d9c033b"}
-  if listing_type == "main":
-    url = "http://api.football-data.org/v2/competitions?areas=2077&plan=TIER_ONE"
+  headers = {'X-Auth-Token': '1ee91953768643e4acd30e197d9c033b'}
+  if listing_type == 'main':
+    url = 'http://api.football-data.org/v2/competitions?areas=2077&plan=TIER_ONE'
     request = urllib2.Request(url, headers=headers)
     r = urllib2.urlopen(request).read()
     data = json.loads(r)
     for l in data['competitions']:
-      rdata.append({'name':"%s (%s)" % (l['name'], l['area']['name']), 'id':l['id']})
+      rdata.append({'name':'{0} ({1})'.format(l['name'], l['area']['name']), 'id':l['id']})
     return rdata
   else:
-    url = "http://api.football-data.org/v2/competitions/%s/matches?dateFrom=%s&dateTo=%s" % (listing_type, today.strftime("%Y-%m-%d"), (today + datetime.timedelta(days=7)).strftime("%Y-%m-%d"))
+    url = 'http://api.football-data.org/v2/competitions/{0}/matches?dateFrom={1:%Y-%m-%d}&dateTo={2:%Y-%m-%d}'.format(listing_type, today, today + datetime.timedelta(days=7))
     request = urllib2.Request(url, headers=headers)
     r = urllib2.urlopen(request).read()
     data = json.loads(r)
     for l in data['matches']:
-      #print  l['utcDate']
-      
-      rdata.append({'name':"%s vs %s %s %s" % (l['homeTeam']['name'], l['awayTeam']['name'], l['utcDate'][:10], l['utcDate'][11:16]), 'status':l['status']})
+      rdata.append({ 'name':'{} vs {} {} {}'.format(l['homeTeam']['name'], l['awayTeam']['name'], l['utcDate'][:10], l['utcDate'][11:16]), 'status':l['status'] })
     return rdata
-  
-#if xbmcvfs.exists('special://temp/streamcache'):
-  #f = xbmcvfs.File ('special://temp/streamcache', 'r')
-  #streams = json.loads(f.read())
-  #f.close()
-  #if time.time() - streams['retrieved'] > 300:#refresh cache every 5 mins
-    #fillcache()
-    #f = xbmcvfs.File ('special://temp/streamcache', 'r')
-    #streams = json.loads(f.read())
-    #f.close()
-#else:
-  #fillcache()
 
-xbmcplugin.setContent(addon_handle, 'movies')
 
 def build_url(query):
     return base_url + '?' + urllib.urlencode(query)
 
 def mainmenu():
+  li = xbmcgui.ListItem("View Leagues", iconImage='DefaultVideo.png')
+  url = build_url({'mode': 'leagues'})
+  xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  li = xbmcgui.ListItem("Live Streams", iconImage='DefaultVideo.png')
+  url = build_url({'mode': 'livestreams'})
+  xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  li = xbmcgui.ListItem("Scheduled recordings", iconImage='DefaultVideo.png')
+  url = build_url({'mode': 'torecord'})
+  xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  xbmcplugin.endOfDirectory(addon_handle)
+  
+def getreplies(data):
+  verified = False
+  try:
+    if data['author_flair_text'] is not None:
+      if re.search('Verified', data['author_flair_text'], re.IGNORECASE): verified = True
+  except:
+    pass
+  try:
+    acestreams = re.findall(r'acestream://([0-9a-z]+)', data['body'])
+    for a in acestreams:
+      links.append({'acestream':a, 'verified':verified})
+  except:
+    pass
+  try:
+    if data['replies']!="":
+      for reply in data['replies']['data']['children']:
+        getreplies(reply['data'])
+  except:
+    pass
+
+addon_handle = int(sys.argv[1])
+xbmcplugin.setContent(addon_handle, 'movies')
+args = urlparse.parse_qs(sys.argv[2][1:])
+mode = args.get('mode', None)
+base_url = sys.argv[0]
+
+settings = xbmcaddon.Addon('plugin.video.socceracestreams')
+base64string = base64.encodestring('{0}:{1}'.format(settings.getSetting('username'), settings.getSetting('password')) ).replace('\n', '')
+
+if mode is None:
+  mainmenu()
+  
+elif mode[0]== 'livestreams':
+  request = urllib2.Request('https://www.reddit.com/r/soccerstreams/search.json?sort=new&restrict_sr=on&q=GMT%20OR%20BST')
+  request.add_header('User-agent', 'Kodi soccerstreams bot 0.1')
+  result = urllib2.urlopen(request)
+  data = json.loads(result.read())
+  for c in data['data']['children']:
+    if re.search("vs",c['data']['title']):
+      url = build_url({'mode': 'livestream_detail', 'link': (c['data']['url']+'search.json').encode('utf-8')})
+      li = xbmcgui.ListItem(c['data']['title'], iconImage='DefaultVideo.png')
+      xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  xbmcplugin.endOfDirectory(addon_handle)
+  
+elif mode[0]== 'livestream_detail':
+  request = urllib2.Request(args['link'][0])
+  request.add_header('User-agent', 'Kodi soccerstreams bot 0.1')
+  result = urllib2.urlopen(request)
+  data = json.loads(result.read())
+  links = []
+  for c in data[1]['data']['children']:
+    getreplies(c['data'])#recursively fetch replies
+  for l in links:
+    url = build_url({'mode': 'startlivestream', 'link': l['acestream']})
+    li = xbmcgui.ListItem(l['acestream'], iconImage='DefaultVideo.png')
+    xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  xbmcplugin.endOfDirectory(addon_handle)
+
+elif mode[0]== 'leagues':
   results = getfixtures('main') 
   
   #[{'name': u'Premier League (England)', 'id': 2021}, {'name': u'Championship (England)', 'id': 2016}, {'name': u'European Championship (Europe)', 'id': 2018}, {'name': u'UEFA Champions League (Europe)', 'id': 2001}, {'name': u'Ligue 1 (France)', 'id': 2015}, {'name': u'Bundesliga (Germany)', 'id': 2002}, {'name': u'Serie A (Italy)', 'id': 2019}, {'name': u'Eredivisie (Netherlands)', 'id': 2003}, {'name': u'Primeira Liga (Portugal)', 'id': 2017}, {'name': u'Primera Division (Spain)', 'id': 2014}]
 
   for f in results:
-    url = build_url({'mode': 'folder', 'foldername': 'league_%s' % f['id']})
+    url = build_url({'mode': 'leaguegame', 'foldername': 'league_%s' % f['id']})
     li = xbmcgui.ListItem(f['name'], iconImage='DefaultFolder.png')
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
-  
-  li = xbmcgui.ListItem("TO RECORD", iconImage='DefaultVideo.png')
-  url = 'https://localhost/listings/live_stream_from_start.mp4'
-  xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li)
   xbmcplugin.endOfDirectory(addon_handle)
-  
-mode = args.get('mode', None)
 
-if mode is None:
-  mainmenu()
-
-elif mode[0] == 'folder':
+elif mode[0] == 'leaguegame':
   foldername = args['foldername'][0]
   lid = foldername[7:]
   results = getfixtures(lid)
@@ -103,7 +145,7 @@ elif mode[0] == 'folder':
     url = build_url({'mode': 'game', 'foldername': f['name'].encode('utf-8')})
     li = xbmcgui.ListItem(f['name'], iconImage='DefaultVideo.png')
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
-    xbmcplugin.endOfDirectory(addon_handle)
+  xbmcplugin.endOfDirectory(addon_handle)
     
 elif mode[0] == 'game':
   url = build_url({'mode': 'gamerecord', 'foldername': args['foldername'][0]})
@@ -113,8 +155,20 @@ elif mode[0] == 'game':
   
 elif mode[0] == 'gamerecord':
   #send request for game record
-  request = urllib2.Request("https://%s/interface.php?action=record&name=%s" % (settings.getSetting('domain'), args['foldername'][0]) )
-  base64string = base64.encodestring('%s:%s' % (settings.getSetting('username'), settings.getSetting('password')) ).replace('\n', '')
+  request = urllib2.Request("https://{0}/interface.php?action=record&name={1}".format(settings.getSetting('domain'), args['foldername'][0]) )
   request.add_header("Authorization", "Basic %s" % base64string)
   result = urllib2.urlopen(request)
   mainmenu()
+
+elif mode[0] == 'torecord':
+  request = urllib2.Request('https://{0}/interface.php?action=torecord'.format(settings.getSetting('domain')))
+  request.add_header("Authorization", "Basic {0}".format(base64string))
+  result = urllib2.urlopen(request)
+  data = json.loads(result.read())
+  for m in data:
+    url = build_url({'mode': 'torecorddetail', 'foldername': m.encode('utf-8')})
+    li = xbmcgui.ListItem(m, iconImage='DefaultVideo.png')
+    xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  xbmcplugin.endOfDirectory(addon_handle)
+    
+  
