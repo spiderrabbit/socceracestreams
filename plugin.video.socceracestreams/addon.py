@@ -49,7 +49,7 @@ def getfixtures(listing_type):
     r = urllib2.urlopen(request).read()
     data = json.loads(r)
     for l in data['matches']:
-      rdata.append({ 'name':'{} vs {} {} {}'.format(l['homeTeam']['name'], l['awayTeam']['name'], l['utcDate'][:10], l['utcDate'][11:16]), 'status':l['status'] })
+      rdata.append({ 'name':'{} vs {} {} {}'.format(l['homeTeam']['name'].encode('utf-8'), l['awayTeam']['name'].encode('utf-8'), l['utcDate'][:10], l['utcDate'][11:16]), 'status':l['status'] })
     return rdata
 
 
@@ -142,7 +142,7 @@ elif mode[0] == 'leaguegame':
   lid = foldername[7:]
   results = getfixtures(lid)
   for f in results:
-    url = build_url({'mode': 'game', 'foldername': f['name'].encode('utf-8')})
+    url = build_url({'mode': 'game', 'foldername': f['name']})
     li = xbmcgui.ListItem(f['name'], iconImage='DefaultVideo.png')
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
   xbmcplugin.endOfDirectory(addon_handle)
@@ -165,10 +165,11 @@ elif mode[0] == 'torecord':
   request.add_header("Authorization", "Basic {0}".format(base64string))
   result = urllib2.urlopen(request)
   data = json.loads(result.read())
-  for m in data:
-    url = build_url({'mode': 'torecorddetail', 'foldername': m.encode('utf-8')})
-    li = xbmcgui.ListItem(m, iconImage='DefaultVideo.png')
-    xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  if data is not None:
+    for m in data:
+      url = build_url({'mode': 'torecorddetail', 'foldername': m.encode('utf-8')})
+      li = xbmcgui.ListItem(m, iconImage='DefaultVideo.png')
+      xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
   xbmcplugin.endOfDirectory(addon_handle)
     
   
