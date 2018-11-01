@@ -54,7 +54,7 @@ def getfixtures(listing_type):
 
 
 def build_url(query):
-    return base_url + '?' + urllib.urlencode(query)
+  return base_url + '?' + urllib.urlencode(query)
 
 def mainmenu():
   li = xbmcgui.ListItem("View Leagues", iconImage='DefaultVideo.png')
@@ -88,6 +88,9 @@ def getreplies(data):
   except:
     pass
 
+
+#xbmc.log("Playing: ".format()) 
+        
 addon_handle = int(sys.argv[1])
 xbmcplugin.setContent(addon_handle, 'movies')
 args = urlparse.parse_qs(sys.argv[2][1:])
@@ -113,20 +116,50 @@ elif mode[0]== 'livestreams':
   xbmcplugin.endOfDirectory(addon_handle)
   
 elif mode[0]== 'livestream_detail':
-  request = urllib2.Request(args['link'][0])
+  if not xbmc.Player().isPlaying():#not playing stop acestream server
+    request = urllib2.Request("{0}://{1}/interface.php?action=stopstream".format(settings.getSetting('protocol'), settings.getSetting('domain')) )
+    request.add_header("Authorization", "Basic %s" % base64string)
+    result = urllib2.urlopen(request)
+  
+  url = 'https://{0}'.format(urllib.quote(args['link'][0][8:]))
+  xbmc.log(url)
+  request = urllib2.Request(url)
   request.add_header('User-agent', 'Kodi soccerstreams bot 0.1')
   result = urllib2.urlopen(request)
   data = json.loads(result.read())
   links = []
   for c in data[1]['data']['children']:
     getreplies(c['data'])#recursively fetch replies
+  linkused = []
   for l in links:
-    url = build_url({'mode': 'startlivestream', 'link': l['acestream']})
-    li = xbmcgui.ListItem(l['acestream'], iconImage='DefaultVideo.png')
-    xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+    if l['acestream'] not in linkused:
+      url = build_url({'mode': 'startlivestream', 'link': l['acestream']})
+      if l['verified']: title = 'VERIFIED {}'.format(l['acestream'])
+      else: title = l['acestream']
+      li = xbmcgui.ListItem(title, iconImage='DefaultVideo.png')
+      linkused.append(l['acestream'])
+      li.setProperty('IsPlayable' , 'true')
+      xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li)
   xbmcplugin.endOfDirectory(addon_handle)
+  
+elif mode[0]== 'startlivestream':
+  #send request to start stream
+  request = urllib2.Request("{0}://{1}/interface.php?action=playstream&stream_id={2}".format(settings.getSetting('protocol'), settings.getSetting('domain'), args['link'][0]) )
+  request.add_header("Authorization", "Basic %s" % base64string)
+  result = urllib2.urlopen(request)
+  progress = xbmcgui.DialogProgress()
+  progress.create('Loading stream')
+  for i in range (0,100,5):
+    progress.update(i, "", '', "")
+    time.sleep(1)
+  # Create a playable item with a path to play.
+  path = '{}://{}:{}@{}/segments/acestream.m3u8'.format(settings.getSetting('protocol'), settings.getSetting('username'), settings.getSetting('password'), settings.getSetting('domain'))
+  play_item = xbmcgui.ListItem(path=path)
+  # Pass the item to the Kodi player.
+  xbmcplugin.setResolvedUrl(addon_handle, True, listitem=play_item)
 
 elif mode[0]== 'leagues':
+  
   results = getfixtures('main') 
   
   #[{'name': u'Premier League (England)', 'id': 2021}, {'name': u'Championship (England)', 'id': 2016}, {'name': u'European Championship (Europe)', 'id': 2018}, {'name': u'UEFA Champions League (Europe)', 'id': 2001}, {'name': u'Ligue 1 (France)', 'id': 2015}, {'name': u'Bundesliga (Germany)', 'id': 2002}, {'name': u'Serie A (Italy)', 'id': 2019}, {'name': u'Eredivisie (Netherlands)', 'id': 2003}, {'name': u'Primeira Liga (Portugal)', 'id': 2017}, {'name': u'Primera Division (Spain)', 'id': 2014}]
@@ -155,13 +188,13 @@ elif mode[0] == 'game':
   
 elif mode[0] == 'gamerecord':
   #send request for game record
-  request = urllib2.Request("https://{0}/interface.php?action=record&name={1}".format(settings.getSetting('domain'), args['foldername'][0]) )
+  request = urllib2.Request("{0}://{1}/interface.php?action=record&name={2}".format(settings.getSetting('protocol'), settings.getSetting('domain'), args['foldername'][0]) )
   request.add_header("Authorization", "Basic %s" % base64string)
   result = urllib2.urlopen(request)
   mainmenu()
 
 elif mode[0] == 'torecord':
-  request = urllib2.Request('https://{0}/interface.php?action=torecord'.format(settings.getSetting('domain')))
+  request = urllib2.Request('{0}://{1}/interface.php?action=torecord'.format(settings.getSetting('protocol'), settings.getSetting('domain')))
   request.add_header("Authorization", "Basic {0}".format(base64string))
   result = urllib2.urlopen(request)
   data = json.loads(result.read())

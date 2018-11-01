@@ -27,3 +27,7 @@ msgstr ""
 msgctxt "#32013"
 msgid "Web address"
 msgstr "" 
+
+msgctxt "#32014"
+msgid "Protocol (http or https)"
+msgstr "" 

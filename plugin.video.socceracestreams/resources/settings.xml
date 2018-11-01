@@ -4,5 +4,6 @@
         <setting label="32011" type="text" id="username" default=""/>
         <setting label="32012" type="text" id="password" option="hidden" enable="!eq(-1,)" default=""/>
         <setting label="32013" type="text" id="domain" default=""/>
+        <setting label="32014" type="text" id="protocol" default=""/>
     </category>
 </settings>
