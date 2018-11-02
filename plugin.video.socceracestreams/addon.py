@@ -159,36 +159,47 @@ elif mode[0]== 'startlivestream':
   xbmcplugin.setResolvedUrl(addon_handle, True, listitem=play_item)
 
 elif mode[0]== 'leagues':
-  
-  results = getfixtures('main') 
-  
+  #results = getfixtures('main') 
+  request = urllib2.Request("{0}://{1}/footballscraper.php?date={2}".format(settings.getSetting('protocol'), settings.getSetting('domain'), datetime.datetime.today().strftime('%Y-%m-%d')))
+  result = urllib2.urlopen(request)
+  results  = json.loads(result.read())
   #[{'name': u'Premier League (England)', 'id': 2021}, {'name': u'Championship (England)', 'id': 2016}, {'name': u'European Championship (Europe)', 'id': 2018}, {'name': u'UEFA Champions League (Europe)', 'id': 2001}, {'name': u'Ligue 1 (France)', 'id': 2015}, {'name': u'Bundesliga (Germany)', 'id': 2002}, {'name': u'Serie A (Italy)', 'id': 2019}, {'name': u'Eredivisie (Netherlands)', 'id': 2003}, {'name': u'Primeira Liga (Portugal)', 'id': 2017}, {'name': u'Primera Division (Spain)', 'id': 2014}]
 
   for f in results:
-    url = build_url({'mode': 'leaguegame', 'foldername': 'league_%s' % f['id']})
-    li = xbmcgui.ListItem(f['name'], iconImage='DefaultFolder.png')
+    url = build_url({'mode': 'leaguedate', 'leaguename': f})
+    li = xbmcgui.ListItem(f, iconImage='DefaultFolder.png')
+    xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  xbmcplugin.endOfDirectory(addon_handle)
+
+elif mode[0] == 'leaguedate':
+  request = urllib2.Request("{0}://{1}/footballscraper.php?date={2}".format(settings.getSetting('protocol'), settings.getSetting('domain'), datetime.datetime.today().strftime('%Y-%m-%d')))
+  result = urllib2.urlopen(request)
+  results  = json.loads(result.read())
+  for f in results[args['leaguename'][0]]:
+    url = build_url({'mode': 'leaguegame', 'leaguename': args['leaguename'][0], 'leaguedate': f})
+    li = xbmcgui.ListItem(f, iconImage='DefaultFolder.png')
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
   xbmcplugin.endOfDirectory(addon_handle)
 
 elif mode[0] == 'leaguegame':
-  foldername = args['foldername'][0]
-  lid = foldername[7:]
-  results = getfixtures(lid)
-  for f in results:
-    url = build_url({'mode': 'game', 'foldername': f['name']})
-    li = xbmcgui.ListItem(f['name'], iconImage='DefaultVideo.png')
+  request = urllib2.Request("{0}://{1}/footballscraper.php?date={2}".format(settings.getSetting('protocol'), settings.getSetting('domain'), datetime.datetime.today().strftime('%Y-%m-%d')))
+  result = urllib2.urlopen(request)
+  results  = json.loads(result.read())
+  for f in results[args['leaguename'][0]][args['leaguedate'][0]]:
+    url = build_url({'mode': 'game', 'match': f})
+    li = xbmcgui.ListItem(f, iconImage='DefaultVideo.png')
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
   xbmcplugin.endOfDirectory(addon_handle)
     
 elif mode[0] == 'game':
-  url = build_url({'mode': 'gamerecord', 'foldername': args['foldername'][0]})
+  url = build_url({'mode': 'gamerecord', 'match': args['match'][0]})
   li = xbmcgui.ListItem("Record", iconImage='DefaultVideo.png')
   xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
   xbmcplugin.endOfDirectory(addon_handle)
   
 elif mode[0] == 'gamerecord':
   #send request for game record
-  request = urllib2.Request("{0}://{1}/interface.php?action=record&name={2}".format(settings.getSetting('protocol'), settings.getSetting('domain'), args['foldername'][0]) )
+  request = urllib2.Request("{0}://{1}/interface.php?action=record&name={2}".format(settings.getSetting('protocol'), settings.getSetting('domain'), args['match'][0]) )
   request.add_header("Authorization", "Basic %s" % base64string)
   result = urllib2.urlopen(request)
   mainmenu()
