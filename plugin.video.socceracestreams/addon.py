@@ -8,49 +8,46 @@ import xbmcaddon
 
 import json, datetime, urllib2, time, base64, re
 
+#def fillcache():
+  #streams = {'retrieved':int(time.time()), 'data':[]}
+  #request = urllib2.Request('https://www.reddit.com/r/soccerstreams/search.json?sort=new&restrict_sr=on&q=GMT', headers={'User-agent': 'Kodi soccerstreams bot 0.1'})
+  #r = urllib2.urlopen(request).read()
+  #result = json.loads(r)
+  ##print result['data']['children']
+  #for p in result['data']['children']:
+    #if re.search(r'GMT',p['data']['title']):
+      #links=[]
+      ##print p['data']['title']
+      ##print p['data']['url']
+      #r = requests.get('%ssearch.json' % (p['data']['url']), headers = {'User-agent': 'Kodi soccerstreams bot 0.1'})
+      #comments = json.loads(r.text)
+      #for c in comments[1]['data']['children']:
+        #getreplies(c['data'])#recursively fetch replies
+      #streams['data'].append({'title':p['data']['title'], 'links':links})
+  #f =xbmcvfs.File ('special://temp/streamcache', 'w')
+  #f.write(json.dumps(streams))
+  #f.close()
 
-
-
-def fillcache():
-  streams = {'retrieved':int(time.time()), 'data':[]}
-  request = urllib2.Request('https://www.reddit.com/r/soccerstreams/search.json?sort=new&restrict_sr=on&q=GMT', headers={'User-agent': 'Kodi soccerstreams bot 0.1'})
-  r = urllib2.urlopen(request).read()
-  result = json.loads(r)
-  #print result['data']['children']
-  for p in result['data']['children']:
-    if re.search(r'GMT',p['data']['title']):
-      links=[]
-      #print p['data']['title']
-      #print p['data']['url']
-      r = requests.get('%ssearch.json' % (p['data']['url']), headers = {'User-agent': 'Kodi soccerstreams bot 0.1'})
-      comments = json.loads(r.text)
-      for c in comments[1]['data']['children']:
-        getreplies(c['data'])#recursively fetch replies
-      streams['data'].append({'title':p['data']['title'], 'links':links})
-  f =xbmcvfs.File ('special://temp/streamcache', 'w')
-  f.write(json.dumps(streams))
-  f.close()
-
-def getfixtures(listing_type):
-  today = datetime.datetime.today()
-  rdata=[]
-  headers = {'X-Auth-Token': '1ee91953768643e4acd30e197d9c033b'}
-  if listing_type == 'main':
-    url = 'http://api.football-data.org/v2/competitions?areas=2077&plan=TIER_ONE'
-    request = urllib2.Request(url, headers=headers)
-    r = urllib2.urlopen(request).read()
-    data = json.loads(r)
-    for l in data['competitions']:
-      rdata.append({'name':'{0} ({1})'.format(l['name'], l['area']['name']), 'id':l['id']})
-    return rdata
-  else:
-    url = 'http://api.football-data.org/v2/competitions/{0}/matches?dateFrom={1:%Y-%m-%d}&dateTo={2:%Y-%m-%d}'.format(listing_type, today, today + datetime.timedelta(days=7))
-    request = urllib2.Request(url, headers=headers)
-    r = urllib2.urlopen(request).read()
-    data = json.loads(r)
-    for l in data['matches']:
-      rdata.append({ 'name':'{} vs {} {} {}'.format(l['homeTeam']['name'].encode('utf-8'), l['awayTeam']['name'].encode('utf-8'), l['utcDate'][:10], l['utcDate'][11:16]), 'status':l['status'] })
-    return rdata
+#def getfixtures(listing_type):
+  #today = datetime.datetime.today()
+  #rdata=[]
+  #headers = {'X-Auth-Token': '1ee91953768643e4acd30e197d9c033b'}
+  #if listing_type == 'main':
+    #url = 'http://api.football-data.org/v2/competitions?areas=2077&plan=TIER_ONE'
+    #request = urllib2.Request(url, headers=headers)
+    #r = urllib2.urlopen(request).read()
+    #data = json.loads(r)
+    #for l in data['competitions']:
+      #rdata.append({'name':'{0} ({1})'.format(l['name'], l['area']['name']), 'id':l['id']})
+    #return rdata
+  #else:
+    #url = 'http://api.football-data.org/v2/competitions/{0}/matches?dateFrom={1:%Y-%m-%d}&dateTo={2:%Y-%m-%d}'.format(listing_type, today, today + datetime.timedelta(days=7))
+    #request = urllib2.Request(url, headers=headers)
+    #r = urllib2.urlopen(request).read()
+    #data = json.loads(r)
+    #for l in data['matches']:
+      #rdata.append({ 'name':'{} vs {} {} {}'.format(l['homeTeam']['name'].encode('utf-8'), l['awayTeam']['name'].encode('utf-8'), l['utcDate'][:10], l['utcDate'][11:16]), 'status':l['status'] })
+    #return rdata
 
 
 def build_url(query):
@@ -165,7 +162,7 @@ elif mode[0]== 'leagues':
   results  = json.loads(result.read())
   #[{'name': u'Premier League (England)', 'id': 2021}, {'name': u'Championship (England)', 'id': 2016}, {'name': u'European Championship (Europe)', 'id': 2018}, {'name': u'UEFA Champions League (Europe)', 'id': 2001}, {'name': u'Ligue 1 (France)', 'id': 2015}, {'name': u'Bundesliga (Germany)', 'id': 2002}, {'name': u'Serie A (Italy)', 'id': 2019}, {'name': u'Eredivisie (Netherlands)', 'id': 2003}, {'name': u'Primeira Liga (Portugal)', 'id': 2017}, {'name': u'Primera Division (Spain)', 'id': 2014}]
 
-  for f in results:
+  for f in sorted(results):
     url = build_url({'mode': 'leaguedate', 'leaguename': f})
     li = xbmcgui.ListItem(f, iconImage='DefaultFolder.png')
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
@@ -175,7 +172,7 @@ elif mode[0] == 'leaguedate':
   request = urllib2.Request("{0}://{1}/footballscraper.php?date={2}".format(settings.getSetting('protocol'), settings.getSetting('domain'), datetime.datetime.today().strftime('%Y-%m-%d')))
   result = urllib2.urlopen(request)
   results  = json.loads(result.read())
-  for f in results[args['leaguename'][0]]:
+  for f in sorted(results[args['leaguename'][0]]):
     url = build_url({'mode': 'leaguegame', 'leaguename': args['leaguename'][0], 'leaguedate': f})
     li = xbmcgui.ListItem(f, iconImage='DefaultFolder.png')
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
