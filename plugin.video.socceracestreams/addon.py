@@ -150,7 +150,7 @@ elif mode[0]== 'startlivestream':
     progress.update(i, "", '', "")
     time.sleep(1)
   # Create a playable item with a path to play.
-  path = '{}://{}:{}@{}/segments/acestream.m3u8'.format(settings.getSetting('protocol'), settings.getSetting('username'), settings.getSetting('password'), settings.getSetting('domain'))
+  path = '{}://{}:{}@{}/listings/LIVE.m3u8'.format(settings.getSetting('protocol'), settings.getSetting('username'), settings.getSetting('password'), settings.getSetting('domain'))
   play_item = xbmcgui.ListItem(path=path)
   # Pass the item to the Kodi player.
   xbmcplugin.setResolvedUrl(addon_handle, True, listitem=play_item)
