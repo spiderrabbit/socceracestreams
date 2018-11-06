@@ -63,6 +63,14 @@ def mainmenu():
   li = xbmcgui.ListItem("Scheduled recordings", iconImage='DefaultVideo.png')
   url = build_url({'mode': 'torecord'})
   xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  request = urllib2.Request("{0}://{1}/interface.php?action=status".format(settings.getSetting('protocol'), settings.getSetting('domain')))
+  request.add_header("Authorization", "Basic %s" % base64string)
+  result = urllib2.urlopen(request)
+  results  = json.loads(result.read())
+  if 'current_recording' in results:
+    li = xbmcgui.ListItem("Currently recording", iconImage='DefaultVideo.png')
+    url = build_url({'mode': 'currentlyrecording'})
+    xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
   xbmcplugin.endOfDirectory(addon_handle)
   
 def getreplies(data):
@@ -96,10 +104,31 @@ base_url = sys.argv[0]
 
 settings = xbmcaddon.Addon('plugin.video.socceracestreams')
 base64string = base64.encodestring('{0}:{1}'.format(settings.getSetting('username'), settings.getSetting('password')) ).replace('\n', '')
+livestreampath = '{}://{}:{}@{}/listings/LIVE.m3u8'.format(settings.getSetting('protocol'), settings.getSetting('username'), settings.getSetting('password'), settings.getSetting('domain'))
 
 if mode is None:
   mainmenu()
   
+elif mode[0]== 'currentlyrecording':
+  request = urllib2.Request("{0}://{1}/interface.php?action=status".format(settings.getSetting('protocol'), settings.getSetting('domain')))
+  request.add_header("Authorization", "Basic %s" % base64string)
+  result = urllib2.urlopen(request)
+  results  = json.loads(result.read())
+  if 'current_recording' in results:
+    li = xbmcgui.ListItem(results['current_recording'], iconImage='DefaultVideo.png')
+    url = livestreampath
+    xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li)
+    url = build_url({'mode': 'stoprecording'})
+    li = xbmcgui.ListItem('Stop recording', iconImage='DefaultVideo.png')
+    xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  xbmcplugin.endOfDirectory(addon_handle)
+
+elif mode[0]== 'stoprecording':
+  request = urllib2.Request("{0}://{1}/interface.php?action=stopstream".format(settings.getSetting('protocol'), settings.getSetting('domain')) )
+  request.add_header("Authorization", "Basic %s" % base64string)
+  result = urllib2.urlopen(request)  
+  mainmenu()
+
 elif mode[0]== 'livestreams':
   request = urllib2.Request('https://www.reddit.com/r/soccerstreams/search.json?sort=new&restrict_sr=on&q=GMT%20OR%20BST')
   request.add_header('User-agent', 'Kodi soccerstreams bot 0.1')
@@ -150,14 +179,14 @@ elif mode[0]== 'startlivestream':
     progress.update(i, "", '', "")
     time.sleep(1)
   # Create a playable item with a path to play.
-  path = '{}://{}:{}@{}/listings/LIVE.m3u8'.format(settings.getSetting('protocol'), settings.getSetting('username'), settings.getSetting('password'), settings.getSetting('domain'))
-  play_item = xbmcgui.ListItem(path=path)
+  play_item = xbmcgui.ListItem(path=livestreampath)
   # Pass the item to the Kodi player.
   xbmcplugin.setResolvedUrl(addon_handle, True, listitem=play_item)
 
 elif mode[0]== 'leagues':
   #results = getfixtures('main') 
   request = urllib2.Request("{0}://{1}/footballscraper.php?date={2}".format(settings.getSetting('protocol'), settings.getSetting('domain'), datetime.datetime.today().strftime('%Y-%m-%d')))
+  request.add_header("Authorization", "Basic %s" % base64string)
   result = urllib2.urlopen(request)
   results  = json.loads(result.read())
   #[{'name': u'Premier League (England)', 'id': 2021}, {'name': u'Championship (England)', 'id': 2016}, {'name': u'European Championship (Europe)', 'id': 2018}, {'name': u'UEFA Champions League (Europe)', 'id': 2001}, {'name': u'Ligue 1 (France)', 'id': 2015}, {'name': u'Bundesliga (Germany)', 'id': 2002}, {'name': u'Serie A (Italy)', 'id': 2019}, {'name': u'Eredivisie (Netherlands)', 'id': 2003}, {'name': u'Primeira Liga (Portugal)', 'id': 2017}, {'name': u'Primera Division (Spain)', 'id': 2014}]
@@ -170,6 +199,7 @@ elif mode[0]== 'leagues':
 
 elif mode[0] == 'leaguedate':
   request = urllib2.Request("{0}://{1}/footballscraper.php?date={2}".format(settings.getSetting('protocol'), settings.getSetting('domain'), datetime.datetime.today().strftime('%Y-%m-%d')))
+  request.add_header("Authorization", "Basic %s" % base64string)
   result = urllib2.urlopen(request)
   results  = json.loads(result.read())
   for f in sorted(results[args['leaguename'][0]]):
@@ -180,10 +210,11 @@ elif mode[0] == 'leaguedate':
 
 elif mode[0] == 'leaguegame':
   request = urllib2.Request("{0}://{1}/footballscraper.php?date={2}".format(settings.getSetting('protocol'), settings.getSetting('domain'), datetime.datetime.today().strftime('%Y-%m-%d')))
+  request.add_header("Authorization", "Basic %s" % base64string)
   result = urllib2.urlopen(request)
   results  = json.loads(result.read())
   for f in results[args['leaguename'][0]][args['leaguedate'][0]]:
-    url = build_url({'mode': 'game', 'match': f})
+    url = build_url({'mode': 'game', 'match': f.encode('utf-8')})
     li = xbmcgui.ListItem(f, iconImage='DefaultVideo.png')
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
   xbmcplugin.endOfDirectory(addon_handle)
@@ -196,21 +227,31 @@ elif mode[0] == 'game':
   
 elif mode[0] == 'gamerecord':
   #send request for game record
-  request = urllib2.Request("{0}://{1}/interface.php?action=record&name={2}".format(settings.getSetting('protocol'), settings.getSetting('domain'), args['match'][0]) )
+  request = urllib2.Request("{0}://{1}/interface.php?{2}".format(settings.getSetting('protocol'), settings.getSetting('domain'), urllib.urlencode({'name':args['match'][0], 'action':'record'})) )
   request.add_header("Authorization", "Basic %s" % base64string)
   result = urllib2.urlopen(request)
   mainmenu()
 
 elif mode[0] == 'torecord':
   request = urllib2.Request('{0}://{1}/interface.php?action=torecord'.format(settings.getSetting('protocol'), settings.getSetting('domain')))
-  request.add_header("Authorization", "Basic {0}".format(base64string))
+  request.add_header("Authorization", "Basic %s" % base64string)
   result = urllib2.urlopen(request)
   data = json.loads(result.read())
   if data is not None:
     for m in data:
-      url = build_url({'mode': 'torecorddetail', 'foldername': m.encode('utf-8')})
+      url = build_url({'mode': 'torecorddetail', 'recording_name': m.encode('utf-8')})
       li = xbmcgui.ListItem(m, iconImage='DefaultVideo.png')
       xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
   xbmcplugin.endOfDirectory(addon_handle)
-    
   
+elif mode[0] == 'torecorddetail':
+  url = build_url({'mode': 'deleterecording', 'recording_name': args['recording_name'][0]})
+  li = xbmcgui.ListItem('Delete', iconImage='DefaultVideo.png')
+  xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  xbmcplugin.endOfDirectory(addon_handle)
+  
+elif mode[0] == 'deleterecording':
+  request = urllib2.Request('{0}://{1}/interface.php?{2}'.format(settings.getSetting('protocol'), settings.getSetting('domain'), urllib.urlencode({'name':args['recording_name'][0], 'action':'deleterecording'})))
+  request.add_header("Authorization", "Basic %s" % base64string)
+  result = urllib2.urlopen(request)
+  mainmenu()
