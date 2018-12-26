@@ -60,7 +60,7 @@ def mainmenu():
   li = xbmcgui.ListItem("Live Streams", iconImage='DefaultVideo.png')
   url = build_url({'mode': 'livestreams'})
   xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
-  li = xbmcgui.ListItem("Scheduled recordings", iconImage='DefaultVideo.png')
+  li = xbmcgui.ListItem("Recordings", iconImage='DefaultVideo.png')
   url = build_url({'mode': 'torecord'})
   xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
   request = urllib2.Request("{0}://{1}/interface.php?action=status".format(settings.getSetting('protocol'), settings.getSetting('domain')))
@@ -233,16 +233,56 @@ elif mode[0] == 'gamerecord':
   mainmenu()
 
 elif mode[0] == 'torecord':
-  request = urllib2.Request('{0}://{1}/interface.php?action=torecord'.format(settings.getSetting('protocol'), settings.getSetting('domain')))
+  request = urllib2.Request('{0}://{1}/interface.php?action=listings'.format(settings.getSetting('protocol'), settings.getSetting('domain')))
+  request.add_header("Authorization", "Basic %s" % base64string)
+  result = urllib2.urlopen(request)
+  #'{"F33GH3XO": "Manchester United vs Huddersfield Town 2018-12-26 15:00_1","53SQFEB4": "Manchester United vs Huddersfield Town 2018-12-26 15:00_2","LACH0304": "TRANSCODED_Manchester United vs Huddersfield Town 2018-12-26 15:00_1"}\n'
+  data = json.loads(result.read())
+  if data is not None:
+    out=[]
+    for m in data:
+      if data[m][:10]!="TRANSCODED":#don't include value with TRANSCOSE - auto find these later when pressing play, second choice is non transcoded
+        out.append('{}|{}'.format(data[m],m))
+    out.sort()
+
+    for m in out:#print sorted list
+      v = m.split('|')
+      url = build_url({'mode': 'playmatch', 'recording_name': v[1]})
+      li = xbmcgui.ListItem(v[0], iconImage='DefaultVideo.png')
+      xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  xbmcplugin.endOfDirectory(addon_handle)
+  
+elif mode[0] == 'playmatch':
+  request = urllib2.Request('{0}://{1}/interface.php?action=listings'.format(settings.getSetting('protocol'), settings.getSetting('domain')))
   request.add_header("Authorization", "Basic %s" % base64string)
   result = urllib2.urlopen(request)
   data = json.loads(result.read())
   if data is not None:
     for m in data:
-      url = build_url({'mode': 'torecorddetail', 'recording_name': m.encode('utf-8')})
-      li = xbmcgui.ListItem(m, iconImage='DefaultVideo.png')
-      xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
-  xbmcplugin.endOfDirectory(addon_handle)
+      if m == args['recording_name'][0]:#found match
+        toplayname = data[m]
+        toplaykey = m
+    for m in data:#look for transcoded file prefix first
+      if data[m] == 'TRANSCODED_{}'.format(toplayname):
+        toplaykey = m
+      
+    # Create a playable item with a path to play.
+    path = '{}://{}:{}@{}/store/{}.mp4'.format(settings.getSetting('protocol'), settings.getSetting('username'), settings.getSetting('password'), settings.getSetting('domain'), toplaykey)
+    li = xbmcgui.ListItem('Play', iconImage='DefaultVideo.png')
+    li.setProperty('IsPlayable', 'true')
+    xbmcplugin.addDirectoryItem(handle=addon_handle, url=path, listitem=li, isFolder=False)
+  xbmcplugin.endOfDirectory(addon_handle)  
+      
+  #request = urllib2.Request('{0}://{1}/interface.php?action=torecord'.format(settings.getSetting('protocol'), settings.getSetting('domain')))
+  #request.add_header("Authorization", "Basic %s" % base64string)
+  #result = urllib2.urlopen(request)
+  #data = json.loads(result.read())
+  #if data is not None:
+    #for m in data:
+      #url = build_url({'mode': 'torecorddetail', 'recording_name': m.encode('utf-8')})
+      #li = xbmcgui.ListItem(m, iconImage='DefaultVideo.png')
+      #xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  #xbmcplugin.endOfDirectory(addon_handle)
   
 elif mode[0] == 'torecorddetail':
   url = build_url({'mode': 'deleterecording', 'recording_name': args['recording_name'][0]})
