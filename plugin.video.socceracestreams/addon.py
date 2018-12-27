@@ -60,17 +60,30 @@ def mainmenu():
   li = xbmcgui.ListItem("Live Streams", iconImage='DefaultVideo.png')
   url = build_url({'mode': 'livestreams'})
   xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
-  li = xbmcgui.ListItem("Recordings", iconImage='DefaultVideo.png')
+  li = xbmcgui.ListItem("Recorded or in progress games", iconImage='DefaultVideo.png')
+  url = build_url({'mode': 'recordedfiles'})
+  xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  li = xbmcgui.ListItem("Set to record", iconImage='DefaultVideo.png')
   url = build_url({'mode': 'torecord'})
   xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  
   request = urllib2.Request("{0}://{1}/interface.php?action=status".format(settings.getSetting('protocol'), settings.getSetting('domain')))
   request.add_header("Authorization", "Basic %s" % base64string)
   result = urllib2.urlopen(request)
   results  = json.loads(result.read())
-  if 'current_recording' in results:
-    li = xbmcgui.ListItem("Currently recording", iconImage='DefaultVideo.png')
-    url = build_url({'mode': 'currentlyrecording'})
-    xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  fontcolor = 'green'
+  if results['ip'] == '' or float(results['diskfreespace'])/1000000000 < 10:
+    fontcolor = 'red'
+    statuslabel = 'ERROR'
+  elif results['current_recording']!='':
+    statuslabel = 'Recording {}'.format(results['current_recording'])
+  else:
+    statuslabel="Not recording"
+    
+  li = xbmcgui.ListItem('[COLOR {}]{}[/COLOR]'.format(fontcolor, statuslabel), iconImage='DefaultVideo.png')
+  li.setInfo('video', { 'plot': "IP: {}Free Space: {}GB\n{}".format(results['ip'], round(float(results['diskfreespace'])/1000000000,1), 'not recording') })
+  url = build_url({'mode': 'currentlyrecording'})
+  xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
   xbmcplugin.endOfDirectory(addon_handle)
   
 def getreplies(data):
@@ -232,7 +245,13 @@ elif mode[0] == 'gamerecord':
   result = urllib2.urlopen(request)
   mainmenu()
 
-elif mode[0] == 'torecord':
+
+elif mode[0] == 'recordedfiles':
+  if 'action' in args:
+    if args['action'][0] == 'delete':
+      request = urllib2.Request('{0}://{1}/interface.php?action=deleterecordedfile&recording={2}'.format(settings.getSetting('protocol'), settings.getSetting('domain'), args['recording_name'][0]))
+      request.add_header("Authorization", "Basic %s" % base64string)
+      result = urllib2.urlopen(request)
   request = urllib2.Request('{0}://{1}/interface.php?action=listings'.format(settings.getSetting('protocol'), settings.getSetting('domain')))
   request.add_header("Authorization", "Basic %s" % base64string)
   result = urllib2.urlopen(request)
@@ -241,14 +260,25 @@ elif mode[0] == 'torecord':
   if data is not None:
     out=[]
     for m in data:
-      if data[m][:10]!="TRANSCODED":#don't include value with TRANSCOSE - auto find these later when pressing play, second choice is non transcoded
+      if data[m][:10]!="TRANSCODED":#don't include value with TRANSCODE - auto find these later when pressing play, second choice is non transcoded
         out.append('{}|{}'.format(data[m],m))
     out.sort()
 
     for m in out:#print sorted list
       v = m.split('|')
       url = build_url({'mode': 'playmatch', 'recording_name': v[1]})
-      li = xbmcgui.ListItem(v[0], iconImage='DefaultVideo.png')
+      tit = v[0].split('_')
+      teams = tit[0].split(' vs ')
+      matchdate = teams[1][-16:]
+      teams[1] = teams[1][:-16]
+      teamshort = ['']*2
+      for i in range(0,2):
+        for m in teams[i].split():
+          teamshort[i] += m[:3]+" "
+      li = xbmcgui.ListItem('{} {} v {} ({})'.format(matchdate[:10], teamshort[0], teamshort[1], tit[1]), iconImage='DefaultVideo.png')
+      li.setInfo('video', { 'plot': "{} vs\n{}\n{}\nPart {}".format(teams[0], teams[1], matchdate, tit[1]) })
+      #li.addStreamInfo('video', { 'duration': '600' })
+      #li.addContextMenuItems([ ('Refresh', 'Container.Refresh'),('Go up', 'Action(ParentDir)') ])
       xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
   xbmcplugin.endOfDirectory(addon_handle)
   
@@ -262,6 +292,7 @@ elif mode[0] == 'playmatch':
       if m == args['recording_name'][0]:#found match
         toplayname = data[m]
         toplaykey = m
+        origtoplaykey = m
     for m in data:#look for transcoded file prefix first
       if data[m] == 'TRANSCODED_{}'.format(toplayname):
         toplaykey = m
@@ -271,18 +302,23 @@ elif mode[0] == 'playmatch':
     li = xbmcgui.ListItem('Play', iconImage='DefaultVideo.png')
     li.setProperty('IsPlayable', 'true')
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=path, listitem=li, isFolder=False)
+    
+    li = xbmcgui.ListItem('Delete', iconImage='DefaultVideo.png')
+    url = build_url({'mode': 'torecord', 'action': 'delete', 'recording_name': origtoplaykey})
+    xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
   xbmcplugin.endOfDirectory(addon_handle)  
-      
-  #request = urllib2.Request('{0}://{1}/interface.php?action=torecord'.format(settings.getSetting('protocol'), settings.getSetting('domain')))
-  #request.add_header("Authorization", "Basic %s" % base64string)
-  #result = urllib2.urlopen(request)
-  #data = json.loads(result.read())
-  #if data is not None:
-    #for m in data:
-      #url = build_url({'mode': 'torecorddetail', 'recording_name': m.encode('utf-8')})
-      #li = xbmcgui.ListItem(m, iconImage='DefaultVideo.png')
-      #xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
-  #xbmcplugin.endOfDirectory(addon_handle)
+
+elif mode[0] == 'torecord':      
+  request = urllib2.Request('{0}://{1}/interface.php?action=torecord'.format(settings.getSetting('protocol'), settings.getSetting('domain')))
+  request.add_header("Authorization", "Basic %s" % base64string)
+  result = urllib2.urlopen(request)
+  data = json.loads(result.read())
+  if data is not None:
+    for m in data:
+      url = build_url({'mode': 'torecorddetail', 'recording_name': m.encode('utf-8')})
+      li = xbmcgui.ListItem(m, iconImage='DefaultVideo.png')
+      xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+  xbmcplugin.endOfDirectory(addon_handle)
   
 elif mode[0] == 'torecorddetail':
   url = build_url({'mode': 'deleterecording', 'recording_name': args['recording_name'][0]})
