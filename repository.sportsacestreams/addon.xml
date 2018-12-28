@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<addon id="repository.sportsacestreams" name="Sports Acestreams Repo" version="1.0" provider-name="socceracestreams">
+<extension point="xbmc.addon.repository" name="Sports Acestreams Repo">
+ <info>https://raw.githubusercontent.com/spiderrabbit/socceracestreams/master/repo/addons.xml</info>
+ <checksum>https://raw.githubusercontent.com/spiderrabbit/socceracestreams/master/repo/addons.xml.md5</checksum>
+ <datadir>https://raw.githubusercontent.com/spiderrabbit/socceracestreams/master/repo/</datadir>
+</extension>
+</addon>
+
