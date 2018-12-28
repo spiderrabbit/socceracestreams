@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<addons><addon id="plugin.video.socceracestreams" name="Reddit soccer acestreams" provider-name="SR" version="0.0.1">
+  <requires>
+    <import addon="xbmc.python" version="2.25.0" />
+    <import addon="xbmc.json" version="7.0.0" />
+  </requires>
+  <extension library="addon.py" point="xbmc.python.pluginsource">
+    <provides>video</provides>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en_GB">Play acestreams from reddit</summary>
+    <description lang="en_GB">Retrieves acestream links from r/soccerstreams. Must be used in conjunction with acestream-to-http server</description>
+    <disclaimer lang="en_GB" />
+    <language />
+    <platform>all</platform>
+    <license />
+    <forum />
+    <website>https://github.com/spiderrabbit/acestream-to-http</website>
+    <email />
+    <source />
+    <news />
+    <assets>
+        <icon>resources/icon.png</icon>
+        <fanart>resources/fanart.jpg</fanart>
+        <banner />
+        <clearlogo />
+        <screenshot />
+    </assets>
+  </extension>
+</addon></addons>
