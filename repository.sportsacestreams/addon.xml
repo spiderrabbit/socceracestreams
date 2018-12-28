@@ -5,5 +5,12 @@
  <checksum>https://raw.githubusercontent.com/spiderrabbit/socceracestreams/master/repo/addons.xml.md5</checksum>
  <datadir>https://raw.githubusercontent.com/spiderrabbit/socceracestreams/master/repo/</datadir>
 </extension>
+<extension point="xbmc.addon.metadata">
+ <summary>The Sportsstreams Repository v1.0</summary>
+ <description>
+  The Sportsstreams Repository for add-on and dependencies
+ </description>
+ <platform>all</platform>
+</extension>
 </addon>
 
